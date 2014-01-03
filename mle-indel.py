@@ -2,7 +2,7 @@
 A more complicated model.
 
 """
-from __future__ import division, print_function
+from __future__ import division, print_function, absolute_import
 
 import argparse
 from functools import partial
@@ -18,6 +18,7 @@ from algopy.special import logit, expit
 import fastem
 import slowem
 from indelmodel import get_c, neg_ll
+from numericml import penalized_packed_neg_ll, unpack_params
 
 
 OBS_ZERO = 0
@@ -111,43 +112,6 @@ def main_em(p_guess, mu_guess, data, mask, nsteps, em_function, extra=1):
 
 
 
-def unpack_params(params, k):
-    """
-    Return the unpacked parameters and a normalization penalty.
-    
-    This is for the numerical likelihood maximization.
-    k is the number of contexts
-
-    """
-    nprobs = k * 2
-
-    # de-concatenate the packed parameters
-    packed_probs = params[:nprobs]
-    packed_mu = params[nprobs:nprobs+2]
-
-    # unpack the probabilities and compute a packing penalty
-    unnormal_probs = exp(packed_probs.reshape((2, k)))
-    denom = unnormal_probs.sum()
-    p = unnormal_probs / denom
-    penalty = square(log(denom))
-
-    # unpack mu
-    mu = expit(packed_mu)
-
-    return p, mu, penalty
-
-
-
-def penalized_packed_neg_ll(k, data, mask, packed_params):
-
-    # Check the input format.
-    assert_equal(data.shape, (3, k))
-
-    # unpack the parameters
-    p, mu, penalty = unpack_params(packed_params, k)
-
-    # Return the penalized negative log likelihood
-    return neg_ll(p, mu, data, mask) + penalty
 
 
 def main_ml(p_guess, mu_guess, data, mask):
@@ -163,6 +127,16 @@ def main_ml(p_guess, mu_guess, data, mask):
 
     """
     k = data.shape[1]
+
+    # Check that the the number of contexts is agreed upon.
+    assert_equal(p_guess.shape[0], 2)
+    assert_equal(mu_guess.shape, (2,))
+    assert_equal(data.shape[0], 3)
+    assert_equal(p_guess.shape[1], data.shape[1])
+
+    # Copy the guesses in case they are modified in place.
+    p_guess = p_guess.copy()
+    mu_guess = mu_guess.copy()
 
     # Pack the guess.
     packed_guess = np.concatenate((log(p_guess.flatten()), logit(mu_guess)))

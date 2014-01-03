@@ -4,7 +4,7 @@ A pure Python module implementing an EM-like iterative algorithm.
 This is for a one-off model.
 
 """
-from __future__ import division, print_function
+from __future__ import division, print_function, absolute_import
 
 import numpy as np
 from numpy.testing import assert_allclose

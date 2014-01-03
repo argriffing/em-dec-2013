@@ -2,6 +2,8 @@
 Define the indel model.
 
 """
+from __future__ import division, print_function, absolute_import
+
 from numpy.testing import assert_equal
 from algopy import log, zeros
 
