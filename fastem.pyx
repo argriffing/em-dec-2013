@@ -20,8 +20,8 @@ __all__ = [
 
 def _check_input_arrays(
         np.float64_t [:, :] p,
-        np.int_t [:, :] mask,
         np.int_t [:, :] data,
+        np.int_t [:, :] mask,
         ):
     """
     Check shapes and contents of input arrays.
@@ -77,8 +77,8 @@ def EM_masked(
         double mu01,
         double mu10,
         np.float64_t [:, :] p,
-        np.int_t [:, :] mask,
         np.int_t [:, :] data,
+        np.int_t [:, :] mask,
         int nsteps,
         int extra,
         ):
@@ -86,7 +86,7 @@ def EM_masked(
     Masked-out entries have missing counts.
 
     """
-    _check_input_arrays(p, mask, data)
+    _check_input_arrays(p, data, mask)
 
     # Initialize some integer constants.
     cdef int k = p.shape[1]

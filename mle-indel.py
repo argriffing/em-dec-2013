@@ -17,6 +17,7 @@ from algopy.special import logit, expit
 
 import fastem
 import slowem
+from indelmodel import get_c, neg_ll
 
 
 OBS_ZERO = 0
@@ -45,36 +46,19 @@ hardcoded_p_2 = np.array([
 hardcoded_mu_2 = np.array([8.97688984e-07, 4.19354839e-01])
 
 
-def slow_em(mu01, mu10, p, data, nsteps, extra):
-
-    # Define the observability mask.
+def get_observability_mask(p):
     mask = np.ones_like(p, dtype=int)
-    mask[OBS_ZERO, INITIAL_CONTEXT] = 0
-    mask[OBS_ONE, FINAL_CONTEXT] = 0
-
-    print('observability mask:')
-    print(mask)
-    print()
-
-    # Use the masked EM.
-    return slowem.EM_masked(mu01, mu10, p, mask, data, nsteps, extra)
-    #return EM(mu01, mu10, p, data, nsteps, extra)
+    #mask[OBS_ZERO, INITIAL_CONTEXT] = 0
+    #mask[OBS_ONE, FINAL_CONTEXT] = 0
+    return mask
 
 
-def fast_em(mu01, mu10, p, data, nsteps, extra):
+def slow_em(mu01, mu10, p, data, mask, nsteps, extra):
+    return slowem.EM_masked(mu01, mu10, p, data, mask, nsteps, extra)
 
-    # Define the observability mask.
-    mask = np.ones_like(p, dtype=int)
-    mask[OBS_ZERO, INITIAL_CONTEXT] = 0
-    mask[OBS_ONE, FINAL_CONTEXT] = 0
 
-    print('observability mask:')
-    print(mask)
-    print()
-
-    # Use the masked EM.
-    return fastem.EM_masked(mu01, mu10, p, mask, data, nsteps, extra)
-    #return EM(mu01, mu10, p, data, nsteps, extra)
+def fast_em(mu01, mu10, p, data, mask, nsteps, extra):
+    return fastem.EM_masked(mu01, mu10, p, data, mask, nsteps, extra)
 
 
 def eval_grad(f, theta):
@@ -87,27 +71,7 @@ def eval_hess(f, theta):
     return algopy.UTPM.extract_hessian(len(theta), f(theta))
 
 
-def get_c(mu, p):
-    """
-    p should have shape (2, k)
-    c should have shape (3, k)
-
-    """
-    assert_equal(len(mu.shape), 1)
-    assert_equal(len(p.shape), 2)
-    assert_equal(mu.shape, (2,))
-    assert_equal(p.shape[0], 2)
-
-    k = p.shape[1]
-    m01, m10 = mu
-    c = zeros((3, k), dtype=p)
-    c[OBS_ZERO] = p[0] * (1 - m01)
-    c[OBS_ONE] = p[1] * (1 - m10)
-    c[OBS_STAR] = p[0] * m01 + p[1] * m10
-    return c
-
-
-def main_em(p_guess, mu_guess, data, nsteps, em_function, extra=1):
+def main_em(p_guess, mu_guess, data, mask, nsteps, em_function, extra=1):
 
     # Check that the the number of contexts is agreed upon.
     assert_equal(p_guess.shape[0], 2)
@@ -122,13 +86,13 @@ def main_em(p_guess, mu_guess, data, nsteps, em_function, extra=1):
     # Run the em.
     mu01_guess, mu10_guess = mu_guess
     mu01, mu10 = em_function(
-            mu01_guess, mu10_guess, p_guess, data, nsteps, extra)
+            mu01_guess, mu10_guess, p_guess, data, mask, nsteps, extra)
     p = p_guess
 
     # Summarize the EM output.
     p_opt = p
     mu_opt = np.array([mu01, mu10])
-    nll = neg_ll(p_opt, mu_opt, data)
+    nll = neg_ll(p_opt, mu_opt, data, mask)
 
     # Report estimates.
     print('EM estimated p parameter values:')
@@ -173,32 +137,8 @@ def unpack_params(params, k):
     return p, mu, penalty
 
 
-def neg_ll(p, mu, data):
-    """
-    Report the negative log liklelihood.
 
-    """
-    k = data.shape[1]
-
-    # compute the conditional distribution
-    c = get_c(mu, p)
-
-    # Convert these probabilities to a conditional distribution.
-    c[0, INITIAL_CONTEXT] = 0
-    c[1, FINAL_CONTEXT] = 0
-    c = c / c.sum()
-
-    # Compute the log of the kernel of the pmf.
-    ll = 0
-    for j in range(3):
-        for i in range(k):
-            if data[j, i]:
-                ll = data[j, i] * log(c[j, i]) + ll
-
-    return -ll
-
-
-def penalized_packed_neg_ll(k, data, packed_params):
+def penalized_packed_neg_ll(k, data, mask, packed_params):
 
     # Check the input format.
     assert_equal(data.shape, (3, k))
@@ -207,10 +147,10 @@ def penalized_packed_neg_ll(k, data, packed_params):
     p, mu, penalty = unpack_params(packed_params, k)
 
     # Return the penalized negative log likelihood
-    return neg_ll(p, mu, data) + penalty
+    return neg_ll(p, mu, data, mask) + penalty
 
 
-def main_ml(p_guess, mu_guess, data):
+def main_ml(p_guess, mu_guess, data, mask):
     """
     Use algopy and scipy minimize with trust-ncg for likelihood maximization.
 
@@ -228,7 +168,7 @@ def main_ml(p_guess, mu_guess, data):
     packed_guess = np.concatenate((log(p_guess.flatten()), logit(mu_guess)))
 
     # Define the objective function, some of its derivatives, and a guess.
-    f = partial(penalized_packed_neg_ll, k, data)
+    f = partial(penalized_packed_neg_ll, k, data, mask)
     g = partial(eval_grad, f)
     h = partial(eval_hess, f)
 
@@ -240,7 +180,7 @@ def main_ml(p_guess, mu_guess, data):
 
     # unpack the optimal parameters
     p_opt, mu_opt, penalty_opt = unpack_params(xopt, k)
-    nll = neg_ll(p_opt, mu_opt, data)
+    nll = neg_ll(p_opt, mu_opt, data, mask)
 
     # Report the max likelihood parameter value estimates.
     print('ML estimated p parameter values:')
@@ -301,6 +241,12 @@ def main(args):
         print('using simulated parameter values')
         print()
 
+    # Get the observability mask.
+    mask = get_observability_mask(p)
+    print('observability mask:')
+    print(mask)
+    print()
+
     # Report the parameter values used for simulation.
     print('Actual p parameter values from which data are sampled:')
     print(p)
@@ -318,8 +264,7 @@ def main(args):
 
     # Convert these probabilities to a conditional distribution.
     cond = c.copy()
-    cond[0, INITIAL_CONTEXT] = 0
-    cond[1, FINAL_CONTEXT] = 0
+    cond[:2] *= mask
     cond /= cond.sum()
 
     # Sample from the conditional multinomial distribution.
@@ -335,7 +280,7 @@ def main(args):
 
     # Report the neg log likelihood for the actual parameter values.
     print('neg log likelihood for actual parameter values:')
-    print(neg_ll(p, mu, n))
+    print(neg_ll(p, mu, n, mask))
     print()
 
     # Initialize the guess.
@@ -348,7 +293,7 @@ def main(args):
     #mu_guess = hardcoded_mu_2
 
     print('neg log likelihood for guess parameter values:')
-    print(neg_ll(p_guess, mu_guess, n))
+    print(neg_ll(p_guess, mu_guess, n, mask))
     print()
 
     # Compute maximum likelihood estimates.
@@ -363,15 +308,15 @@ def main(args):
                 extra=args.extra)
     elif args.solver is None:
         print('fast em...')
-        main_em(p_guess, mu_guess, n, args.em_iterations, fast_em,
+        main_em(p_guess, mu_guess, n, mask, args.em_iterations, fast_em,
                 extra=args.extra)
         print()
         print('slow em...')
-        main_em(p_guess, mu_guess, n, args.em_iterations, slow_em,
+        main_em(p_guess, mu_guess, n, mask, args.em_iterations, slow_em,
                 extra=args.extra)
         print()
         print('ml...')
-        main_ml(p_guess, mu_guess, n)
+        main_ml(p_guess, mu_guess, n, mask)
         print()
     else:
         raise NotImplementedError(args.solver)

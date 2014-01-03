@@ -21,7 +21,7 @@ xdivy = np.vectorize(_xdivy_helper)
 
 
 
-def EM_masked(mu01, mu10, p, mask, data, nsteps, extra=1):
+def EM_masked(mu01, mu10, p, data, mask, nsteps, extra=1):
     """
     Masked-out entries have missing counts.
 
@@ -33,10 +33,10 @@ def EM_masked(mu01, mu10, p, mask, data, nsteps, extra=1):
         mutation probability
     p : 2d float array with shape (2, k)
         probability distribution over latent states
-    mask : 2d binary array with shape (2, k)
-        observability mask
     data : 2d integer array with shape (3, k)
         array of observed counts
+    mask : 2d binary array with shape (2, k)
+        observability mask
     nsteps : int
         use this many steps of expectation maximization
     extra : int
