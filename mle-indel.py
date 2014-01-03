@@ -107,54 +107,6 @@ def get_c(mu, p):
     return c
 
 
-def slow_em_old(mu01, mu10, p, data, nsteps, extra=1):
-    k = data.shape[1]
-
-    for i in range(nsteps):
-
-        assert_allclose(p.sum(), 1)
-
-        # Expand the parameters into a (4, k) table.
-        # For the rest of the iteration,
-        # we will work with the parameters only through this table.
-        q = np.empty((4, k))
-        q[0] = p[0] * (1 - mu01)
-        q[1] = p[1] * (1 - mu10)
-        q[STAR_ZERO] = p[0] * mu01
-        q[STAR_ONE] = p[1] * mu10
-
-        assert_allclose(q.sum(), 1)
-
-        # Compute the expectations.
-        # This will essentially impute the missing 000 and 111 counts
-        # as well as imputing the refinement of the star category,
-        # imputing the latent states.
-        ntotal = data.sum()
-        qstar = q[STAR_ZERO] + q[STAR_ONE]
-        qmissing = q[0, INITIAL_CONTEXT] + q[1, FINAL_CONTEXT]
-        aug_excess = (ntotal + extra) * qmissing / (1 - qmissing)
-        aug = np.empty((4, k))
-        aug[0] = data[0]
-        aug[1] = data[1]
-        aug[STAR_ZERO] = (q[STAR_ZERO] / qstar) * data[OBS_STAR]
-        aug[STAR_ONE] = (q[STAR_ONE] / qstar) * data[OBS_STAR]
-        aug[0, INITIAL_CONTEXT] = (
-                q[0, INITIAL_CONTEXT] / qmissing) * aug_excess
-        aug[1, FINAL_CONTEXT] = (
-                q[1, FINAL_CONTEXT] / qmissing) * aug_excess
-        aug_total = ntotal + aug_excess
-
-        assert_allclose(aug_total, aug.sum())
-
-        # Update the parameter estimates.
-        p[0] = (aug[0] + aug[STAR_ZERO]) / aug_total
-        p[1] = (aug[1] + aug[STAR_ONE]) / aug_total
-        mu01 = aug[STAR_ZERO].sum() / (aug[0] + aug[STAR_ZERO]).sum()
-        mu10 = aug[STAR_ONE].sum() / (aug[1] + aug[STAR_ONE]).sum()
-
-    return mu01, mu10
-
-
 def main_em(p_guess, mu_guess, data, nsteps, em_function, extra=1):
 
     # Check that the the number of contexts is agreed upon.
