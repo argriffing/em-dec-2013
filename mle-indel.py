@@ -15,9 +15,9 @@ import algopy
 from algopy import log, exp, square, zeros
 from algopy.special import logit, expit
 
-#from fastem import EM as fast_em
+import fastem
+import slowem
 
-from fastem import EM, EM_masked
 
 OBS_ZERO = 0
 OBS_ONE = 1
@@ -45,6 +45,22 @@ hardcoded_p_2 = np.array([
 hardcoded_mu_2 = np.array([8.97688984e-07, 4.19354839e-01])
 
 
+def slow_em(mu01, mu10, p, data, nsteps, extra):
+
+    # Define the observability mask.
+    mask = np.ones_like(p, dtype=int)
+    mask[OBS_ZERO, INITIAL_CONTEXT] = 0
+    mask[OBS_ONE, FINAL_CONTEXT] = 0
+
+    print('observability mask:')
+    print(mask)
+    print()
+
+    # Use the masked EM.
+    return slowem.EM_masked(mu01, mu10, p, mask, data, nsteps, extra)
+    #return EM(mu01, mu10, p, data, nsteps, extra)
+
+
 def fast_em(mu01, mu10, p, data, nsteps, extra):
 
     # Define the observability mask.
@@ -57,7 +73,7 @@ def fast_em(mu01, mu10, p, data, nsteps, extra):
     print()
 
     # Use the masked EM.
-    return EM_masked(mu01, mu10, p, mask, data, nsteps, extra)
+    return fastem.EM_masked(mu01, mu10, p, mask, data, nsteps, extra)
     #return EM(mu01, mu10, p, data, nsteps, extra)
 
 
@@ -91,7 +107,7 @@ def get_c(mu, p):
     return c
 
 
-def slow_em(mu01, mu10, p, data, nsteps, extra=1):
+def slow_em_old(mu01, mu10, p, data, nsteps, extra=1):
     k = data.shape[1]
 
     for i in range(nsteps):
@@ -394,9 +410,17 @@ def main(args):
         main_em(p_guess, mu_guess, n, args.em_iterations, f,
                 extra=args.extra)
     elif args.solver is None:
+        print('fast em...')
         main_em(p_guess, mu_guess, n, args.em_iterations, fast_em,
                 extra=args.extra)
+        print()
+        print('slow em...')
+        main_em(p_guess, mu_guess, n, args.em_iterations, slow_em,
+                extra=args.extra)
+        print()
+        print('ml...')
         main_ml(p_guess, mu_guess, n)
+        print()
     else:
         raise NotImplementedError(args.solver)
 
