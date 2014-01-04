@@ -4,13 +4,54 @@ Numerical maximization of expected log likelihood.
 """
 from __future__ import division, print_function, absolute_import
 
+from functools import partial
+
 import numpy as np
 from numpy.testing import assert_equal
+import scipy.optimize
 
+import algopy
 from algopy import log, exp, square, zeros
 from algopy.special import logit, expit
 
 from indelmodel import neg_ll
+
+
+__all__ = [
+        'infer_parameter_values',
+        ]
+
+
+def eval_grad(f, theta):
+    theta = algopy.UTPM.init_jacobian(theta)
+    return algopy.UTPM.extract_jacobian(f(theta))
+
+
+def eval_hess(f, theta):
+    theta = algopy.UTPM.init_hessian(theta)
+    return algopy.UTPM.extract_hessian(len(theta), f(theta))
+
+
+def infer_parameter_values(p_guess, mu_guess, data, mask):
+    k = p_guess.shape[1]
+
+    # Pack the guess.
+    packed_guess = np.concatenate((log(p_guess.flatten()), logit(mu_guess)))
+
+    # Define the objective function, some of its derivatives, and a guess.
+    f = partial(penalized_packed_neg_ll, k, data, mask)
+    g = partial(eval_grad, f)
+    h = partial(eval_hess, f)
+
+    # Search for the maximum likelihood parameter values.
+    res = scipy.optimize.minimize(
+            f, packed_guess, method='trust-ncg', jac=g, hess=h)
+    xopt = res.x
+
+    # unpack the optimal parameters
+    p_opt, mu_opt, penalty_opt = unpack_params(xopt, k)
+
+    return p_opt, mu_opt
 
 
 def unpack_params(params, k):

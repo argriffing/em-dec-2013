@@ -18,7 +18,8 @@ from algopy.special import logit, expit
 import fastem
 import slowem
 from indelmodel import get_c, neg_ll
-from numericml import penalized_packed_neg_ll, unpack_params
+import numericml
+#from numericml import penalized_packed_neg_ll, unpack_params
 
 
 OBS_ZERO = 0
@@ -61,15 +62,6 @@ def slow_em(mu01, mu10, p, data, mask, nsteps, extra):
 def fast_em(mu01, mu10, p, data, mask, nsteps, extra):
     return fastem.EM_masked(mu01, mu10, p, data, mask, nsteps, extra)
 
-
-def eval_grad(f, theta):
-    theta = algopy.UTPM.init_jacobian(theta)
-    return algopy.UTPM.extract_jacobian(f(theta))
-
-
-def eval_hess(f, theta):
-    theta = algopy.UTPM.init_hessian(theta)
-    return algopy.UTPM.extract_hessian(len(theta), f(theta))
 
 
 def main_em(p_guess, mu_guess, data, mask, nsteps, em_function, extra=1):
@@ -138,22 +130,12 @@ def main_ml(p_guess, mu_guess, data, mask):
     p_guess = p_guess.copy()
     mu_guess = mu_guess.copy()
 
-    # Pack the guess.
-    packed_guess = np.concatenate((log(p_guess.flatten()), logit(mu_guess)))
+    # Infer the parameter values using a numerical optimization.
+    p_opt, mu_opt = numericml.infer_parameter_values(
+            p_guess, mu_guess, data, mask)
 
-    # Define the objective function, some of its derivatives, and a guess.
-    f = partial(penalized_packed_neg_ll, k, data, mask)
-    g = partial(eval_grad, f)
-    h = partial(eval_hess, f)
-
-    # Search for the maximum likelihood parameter values.
-    res = scipy.optimize.minimize(
-            f, packed_guess, method='trust-ncg', jac=g, hess=h)
-    xopt = res.x
-    yopt = f(xopt)
-
-    # unpack the optimal parameters
-    p_opt, mu_opt, penalty_opt = unpack_params(xopt, k)
+    # Compute functions of the estimated parameter values.
+    q = get_parameter_transformation(mu_opt[0], mu_opt[1], p_opt)
     nll = neg_ll(p_opt, mu_opt, data, mask)
 
     # Report the max likelihood parameter value estimates.
@@ -164,14 +146,10 @@ def main_ml(p_guess, mu_guess, data, mask):
     print(mu_opt)
     print()
     print('ML transformed parameters for guessing ancestral state:')
-    q = get_parameter_transformation(mu_opt[0], mu_opt[1], p_opt)
     print(q)
     print()
     print('ML estimated neg log likelihood:')
     print(nll)
-    print()
-    print('ML opt penalty (should be near zero):')
-    print(penalty_opt)
     print()
 
 
