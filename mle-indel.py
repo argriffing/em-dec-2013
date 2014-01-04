@@ -5,21 +5,15 @@ A more complicated model.
 from __future__ import division, print_function, absolute_import
 
 import argparse
-from functools import partial
 import sys
 
 import numpy as np
 from numpy.testing import assert_equal, assert_allclose
-import scipy.optimize
-import algopy
-from algopy import log, exp, square, zeros
-from algopy.special import logit, expit
 
 import fastem
 import slowem
 from indelmodel import get_c, neg_ll
 import numericml
-#from numericml import penalized_packed_neg_ll, unpack_params
 
 
 OBS_ZERO = 0
@@ -28,9 +22,6 @@ OBS_STAR = 2
 
 STAR_ZERO = 2
 STAR_ONE = 3
-
-INITIAL_CONTEXT = 0
-FINAL_CONTEXT = -1
 
 hardcoded_p_1 = np.array([
     [ 0.12826218, 0.24608812, 0.14997917, 0.10612475],
@@ -50,8 +41,8 @@ hardcoded_mu_2 = np.array([8.97688984e-07, 4.19354839e-01])
 
 def get_observability_mask(p):
     mask = np.ones_like(p, dtype=int)
-    #mask[OBS_ZERO, INITIAL_CONTEXT] = 0
-    #mask[OBS_ONE, FINAL_CONTEXT] = 0
+    #mask[OBS_ZERO, 0] = 0
+    #mask[OBS_ONE, -1] = 0
     return mask
 
 
@@ -263,10 +254,10 @@ def main(args):
         main_em(p_guess, mu_guess, n, mask, args.em_iterations, fast_em,
                 extra=args.extra)
         print()
-        print('slow em...')
-        main_em(p_guess, mu_guess, n, mask, args.em_iterations, slow_em,
-                extra=args.extra)
-        print()
+        #print('slow em...')
+        #main_em(p_guess, mu_guess, n, mask, args.em_iterations, slow_em,
+                #extra=args.extra)
+        #print()
         print('ml...')
         main_ml(p_guess, mu_guess, n, mask)
         print()
