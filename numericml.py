@@ -31,6 +31,10 @@ def eval_hess(f, theta):
     theta = algopy.UTPM.init_hessian(theta)
     return algopy.UTPM.extract_hessian(len(theta), f(theta))
 
+def eval_hessp(f, theta, v):
+    theta = algopy.UTPM.init_hess_vec(theta, v)
+    return algopy.UTPM.extract_hess_vec(len(theta), f(theta))
+
 
 def infer_parameter_values(p_guess, mu_guess, data, mask):
     k = p_guess.shape[1]
@@ -42,10 +46,16 @@ def infer_parameter_values(p_guess, mu_guess, data, mask):
     f = partial(penalized_packed_neg_ll, k, data, mask)
     g = partial(eval_grad, f)
     h = partial(eval_hess, f)
+    hessp = partial(eval_hessp, f)
 
     # Search for the maximum likelihood parameter values.
+    # The direct hessp evaluation turns out to be slower, for some reason,
+    # than directly calculating the hessian and then multiplying.
     res = scipy.optimize.minimize(
-            f, packed_guess, method='trust-ncg', jac=g, hess=h)
+            f, packed_guess, method='trust-ncg', jac=g,
+            hess=h,
+            #hessp=hessp,
+            )
     xopt = res.x
 
     # unpack the optimal parameters

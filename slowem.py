@@ -118,8 +118,7 @@ def EM_masked(mu01, mu10, p, data, mask, nsteps, extra=1):
         aug_excess = (ntotal + extra) * qmissing / (1 - qmissing)
         aug_total = ntotal + aug_excess
         aug[:2] = data[:2]
-        if aug_excess and qmissing:
-            aug[:2] += (1 - mask) * q[:2] * (aug_excess / qmissing)
+        aug[:2] += (1 - mask) * q[:2] * xdivy(aug_excess, qmissing)
 
         # Get the next two rows of augmented data.
         aug[2:] = xdivy(q[2:] * data[OBS_STAR], qstar)

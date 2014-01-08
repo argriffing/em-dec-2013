@@ -6,6 +6,7 @@ from __future__ import division, print_function, absolute_import
 
 import argparse
 import sys
+import time
 
 import numpy as np
 from numpy.testing import assert_equal, assert_allclose
@@ -41,8 +42,8 @@ hardcoded_mu_2 = np.array([8.97688984e-07, 4.19354839e-01])
 
 def get_observability_mask(p):
     mask = np.ones_like(p, dtype=int)
-    #mask[OBS_ZERO, 0] = 0
-    #mask[OBS_ONE, -1] = 0
+    mask[OBS_ZERO, 0] = 0
+    mask[OBS_ONE, -1] = 0
     return mask
 
 
@@ -251,15 +252,21 @@ def main(args):
                 extra=args.extra)
     elif args.solver is None:
         print('fast em...')
+        tm_start = time.time()
         main_em(p_guess, mu_guess, n, mask, args.em_iterations, fast_em,
                 extra=args.extra)
+        tm_end = time.time()
+        print(tm_end - tm_start, 'seconds')
         print()
         #print('slow em...')
         #main_em(p_guess, mu_guess, n, mask, args.em_iterations, slow_em,
                 #extra=args.extra)
         #print()
         print('ml...')
+        tm_start = time.time()
         main_ml(p_guess, mu_guess, n, mask)
+        tm_end = time.time()
+        print(tm_end - tm_start, 'seconds')
         print()
     else:
         raise NotImplementedError(args.solver)
