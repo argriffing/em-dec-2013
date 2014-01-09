@@ -62,8 +62,8 @@ def infer_parameter_values(p_guess, mu_guess, data, mask):
     # than directly calculating the hessian and then multiplying.
     res = scipy.optimize.minimize(
             f, packed_guess, method='trust-ncg', jac=g,
-            hess=h,
-            #hessp=hessp,
+            #hess=h,
+            hessp=hessp,
             )
     xopt = res.x
 
