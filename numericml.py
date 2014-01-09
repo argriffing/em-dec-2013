@@ -31,6 +31,7 @@ def eval_hess(f, theta):
     theta = algopy.UTPM.init_hessian(theta)
     return algopy.UTPM.extract_hessian(len(theta), f(theta))
 
+
 def eval_hessp(f, theta, v):
     theta = algopy.UTPM.init_hess_vec(theta, v)
     return algopy.UTPM.extract_hess_vec(len(theta), f(theta))
@@ -46,7 +47,15 @@ def infer_parameter_values(p_guess, mu_guess, data, mask):
     f = partial(penalized_packed_neg_ll, k, data, mask)
     g = partial(eval_grad, f)
     h = partial(eval_hess, f)
-    hessp = partial(eval_hessp, f)
+    #hessp = partial(eval_hessp, f)
+
+    cg = algopy.CGraph()
+    x = algopy.Function(list(range(1, len(packed_guess)+1)))
+    y = f(x)
+    cg.trace_off()
+    cg.independentFunctionList = [x]
+    cg.dependentFunctionList = [y]
+    hessp = cg.hess_vec
 
     # Search for the maximum likelihood parameter values.
     # The direct hessp evaluation turns out to be slower, for some reason,

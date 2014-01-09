@@ -242,7 +242,12 @@ def main(args):
 
     # Compute maximum likelihood estimates.
     if args.solver == 'ml':
-        main_ml(p_guess, mu_guess, n)
+        print('ml...')
+        tm_start = time.time()
+        main_ml(p_guess, mu_guess, n, mask)
+        tm_end = time.time()
+        print(tm_end - tm_start, 'seconds')
+        print()
     elif args.solver in ('fast-em', 'slow-em'):
         if args.solver == 'fast-em':
             f = fast_em
