@@ -99,7 +99,7 @@ def main_ml(p_guess, mu_guess, data, mask):
     print('Eigenvalues of Hessian:')
     print(scipy.linalg.eigvalsh(hess_opt))
     print()
-    print('Inverse of Hessian information at MLE:')
+    print('Inverse of Hessian at MLE:')
     print(np.linalg.inv(hess_opt))
     print()
 
