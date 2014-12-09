@@ -11,4 +11,5 @@ fastem.so: fastem.c
 
 clean:
 	rm fastem.so fastem.c fastem.html
+	rm -f *.pyc
 

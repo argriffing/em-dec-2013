@@ -49,28 +49,28 @@ def infer_parameter_values(p_guess, mu_guess, data, mask):
     h = partial(eval_hess, f)
     #hessp = partial(eval_hessp, f)
 
-    cg = algopy.CGraph()
-    x = algopy.Function(list(range(1, len(packed_guess)+1)))
-    y = f(x)
-    cg.trace_off()
-    cg.independentFunctionList = [x]
-    cg.dependentFunctionList = [y]
-    hessp = cg.hess_vec
+    #cg = algopy.CGraph()
+    #x = algopy.Function(list(range(1, len(packed_guess)+1)))
+    #y = f(x)
+    #cg.trace_off()
+    #cg.independentFunctionList = [x]
+    #cg.dependentFunctionList = [y]
+    #hessp = cg.hess_vec
 
     # Search for the maximum likelihood parameter values.
     # The direct hessp evaluation turns out to be slower, for some reason,
     # than directly calculating the hessian and then multiplying.
     res = scipy.optimize.minimize(
             f, packed_guess, method='trust-ncg', jac=g,
-            #hess=h,
-            hessp=hessp,
+            hess=h,
+            #hessp=hessp,
             )
     xopt = res.x
 
     # unpack the optimal parameters
     p_opt, mu_opt, penalty_opt = unpack_params(xopt, k)
 
-    return p_opt, mu_opt
+    return p_opt, mu_opt, h(xopt)
 
 
 def unpack_params(params, k):

@@ -1,5 +1,8 @@
 """
-A more complicated model.
+Maximum likelihood estimation for a specific model.
+
+The incorrect "expectation maximization"
+code has been removed from this module.
 
 """
 from __future__ import division, print_function, absolute_import
@@ -10,9 +13,8 @@ import time
 
 import numpy as np
 from numpy.testing import assert_equal, assert_allclose
+import scipy.linalg
 
-import fastem
-import slowem
 from indelmodel import get_c, neg_ll
 import numericml
 
@@ -20,9 +22,6 @@ import numericml
 OBS_ZERO = 0
 OBS_ONE = 1
 OBS_STAR = 2
-
-STAR_ZERO = 2
-STAR_ONE = 3
 
 hardcoded_p_1 = np.array([
     [ 0.12826218, 0.24608812, 0.14997917, 0.10612475],
@@ -40,62 +39,13 @@ hardcoded_p_2 = np.array([
 hardcoded_mu_2 = np.array([8.97688984e-07, 4.19354839e-01])
 
 
-def get_observability_mask(p):
-    mask = np.ones_like(p, dtype=int)
+def get_observability_mask(k):
+    # The mask has three rows corresponding to OBS_ZERO, OBS_ONE
+    # The number of columns is k, which is equal to the number of contexts.
+    mask = np.ones((2, k))
     mask[OBS_ZERO, 0] = 0
-    mask[OBS_ONE, -1] = 0
+    #mask[OBS_ONE, -1] = 0
     return mask
-
-
-def slow_em(mu01, mu10, p, data, mask, nsteps, extra):
-    return slowem.EM_masked(mu01, mu10, p, data, mask, nsteps, extra)
-
-
-def fast_em(mu01, mu10, p, data, mask, nsteps, extra):
-    return fastem.EM_masked(mu01, mu10, p, data, mask, nsteps, extra)
-
-
-
-def main_em(p_guess, mu_guess, data, mask, nsteps, em_function, extra=1):
-
-    # Check that the the number of contexts is agreed upon.
-    assert_equal(p_guess.shape[0], 2)
-    assert_equal(mu_guess.shape, (2,))
-    assert_equal(data.shape[0], 3)
-    assert_equal(p_guess.shape[1], data.shape[1])
-
-    # Copy the guesses in case they are modified in place.
-    p_guess = p_guess.copy()
-    mu_guess = mu_guess.copy()
-
-    # Run the em.
-    mu01_guess, mu10_guess = mu_guess
-    mu01, mu10 = em_function(
-            mu01_guess, mu10_guess, p_guess, data, mask, nsteps, extra)
-    p = p_guess
-
-    # Summarize the EM output.
-    p_opt = p
-    mu_opt = np.array([mu01, mu10])
-    nll = neg_ll(p_opt, mu_opt, data, mask)
-
-    # Report estimates.
-    print('EM estimated p parameter values:')
-    print(p_opt)
-    print()
-    print('EM estimated mu parameter values:')
-    print(mu_opt)
-    print()
-    print('EM transformed parameters for guessing ancestral state:')
-    q = get_parameter_transformation(mu_opt[0], mu_opt[1], p_opt)
-    print(q)
-    print()
-    print('EM estimated neg log likelihood:')
-    print(nll)
-    print()
-
-
-
 
 
 def main_ml(p_guess, mu_guess, data, mask):
@@ -123,7 +73,7 @@ def main_ml(p_guess, mu_guess, data, mask):
     mu_guess = mu_guess.copy()
 
     # Infer the parameter values using a numerical optimization.
-    p_opt, mu_opt = numericml.infer_parameter_values(
+    p_opt, mu_opt, hess_opt = numericml.infer_parameter_values(
             p_guess, mu_guess, data, mask)
 
     # Compute functions of the estimated parameter values.
@@ -142,6 +92,14 @@ def main_ml(p_guess, mu_guess, data, mask):
     print()
     print('ML estimated neg log likelihood:')
     print(nll)
+    print()
+    print('Hessian at MLE:')
+    print(hess_opt)
+    print()
+    print('Eigenvalues of Hessian:')
+    print(scipy.linalg.eigvalsh(hess_opt))
+    print('Inverse of Hessian information at MLE:')
+    print(np.linalg.inv(hess_opt))
     print()
 
 
@@ -186,7 +144,7 @@ def main(args):
         print()
 
     # Get the observability mask.
-    mask = get_observability_mask(p)
+    mask = get_observability_mask(k)
     print('observability mask:')
     print(mask)
     print()
@@ -241,47 +199,17 @@ def main(args):
     print()
 
     # Compute maximum likelihood estimates.
-    if args.solver == 'ml':
-        print('ml...')
-        tm_start = time.time()
-        main_ml(p_guess, mu_guess, n, mask)
-        tm_end = time.time()
-        print(tm_end - tm_start, 'seconds')
-        print()
-    elif args.solver in ('fast-em', 'slow-em'):
-        if args.solver == 'fast-em':
-            f = fast_em
-        elif args.solver == 'slow-em':
-            f = slow_em
-        main_em(p_guess, mu_guess, n, args.em_iterations, f,
-                extra=args.extra)
-    elif args.solver is None:
-        print('fast em...')
-        tm_start = time.time()
-        main_em(p_guess, mu_guess, n, mask, args.em_iterations, fast_em,
-                extra=args.extra)
-        tm_end = time.time()
-        print(tm_end - tm_start, 'seconds')
-        print()
-        #print('slow em...')
-        #main_em(p_guess, mu_guess, n, mask, args.em_iterations, slow_em,
-                #extra=args.extra)
-        #print()
-        print('ml...')
-        tm_start = time.time()
-        main_ml(p_guess, mu_guess, n, mask)
-        tm_end = time.time()
-        print(tm_end - tm_start, 'seconds')
-        print()
-    else:
-        raise NotImplementedError(args.solver)
+    print('ml...')
+    tm_start = time.time()
+    main_ml(p_guess, mu_guess, n, mask)
+    tm_end = time.time()
+    print(tm_end - tm_start, 'seconds')
+    print()
 
 
 if __name__ == '__main__':
+    np.set_printoptions(linewidth=200)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--solver',
-            choices=('ml', 'fast-em', 'slow-em'),
-            help='ml is numerical MLE, em is expectation maximization')
     parser.add_argument('--contexts',
             type=int, default=4,
             help='number of contexts (default 4)')
@@ -291,11 +219,5 @@ if __name__ == '__main__':
     parser.add_argument('--sites',
             type=int, default=1000,
             help='number of observed sites')
-    parser.add_argument('--em-iterations',
-            type=int, default=1000,
-            help='number of EM iterations')
-    parser.add_argument('--extra',
-            type=int, default=1,
-            help='extra count added to the observed total, for debugging')
     main(parser.parse_args())
 
